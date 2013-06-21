@@ -161,7 +161,22 @@ class Version(models.Model):
         """The stored version of the model."""
         data = self.serialized_data
         data = force_text(data.encode("utf8"))
-        return list(serializers.deserialize(self.format, data, ignorenonexistent=True))[0]
+
+        obj = self.object
+
+        reverted_obj = list(serializers.deserialize(self.format, data, ignorenonexistent=True))[0]
+
+        from reversion.revisions import RevisionManager
+        manager = RevisionManager.get_manager(self.revision.manager_slug)
+        fields = manager.get_adapter(self.content_type.model_class()).fields
+
+        for field in fields:
+            setattr(obj, field, getattr(reverted_obj.object, field))
+
+        reverted_obj.object = obj
+
+        return reverted_obj
+
     
     type = models.PositiveSmallIntegerField(choices=VERSION_TYPE_CHOICES, db_index=True)
     
